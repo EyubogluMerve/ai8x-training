@@ -487,6 +487,7 @@ class KWS:
         return len(self.data)
 
     def __getitem__(self, index):
+        #print(index)
         inp, target = self.data[index], int(self.targets[index])
 
         inp = self.__dynamic_augment(inp)

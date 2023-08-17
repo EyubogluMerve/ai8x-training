@@ -54,7 +54,7 @@ class KWS:
     root (string): Root directory of dataset where ``KWS/processed/dataset.pt``
         exist.
     classes(array): List of keywords to be used.
-    d_type(string): Option for the created dataset. ``train``, ``val``  or ``test``.
+    d_type(string): Option for the created dataset. ``train`` or ``test``.
     n_augment(int, optional): Number of augmented samples added to the dataset from
         each sample by random modifications, i.e. stretching, shifting and random noise.
     transform (callable, optional): A function/transform that takes in an PIL image
@@ -88,13 +88,20 @@ class KWS:
         self.transform = transform
         self.save_unquantized = save_unquantized
         self.noise = np.empty(shape=[0, 0])
+
         self.__parse_quantization(quantization_scheme)
         self.__parse_augmentation(augmentation)
 
+        if not self.save_unquantized:
+            self.data_file = 'dataset2.pt'
+        else:
+            self.data_file = 'unquantized.pt'
+
         if download:
             self.__download()
-        
-        self.data, self.targets, self.data_type = self.__gen_datasets()
+
+        self.data, self.targets, self.data_type = torch.load(os.path.join(
+            self.processed_folder, self.data_file))
 
         print(f'\nProcessing {self.d_type}...')
         self.__filter_dtype()
@@ -117,6 +124,12 @@ class KWS:
         """Folder for the different noise data.
         """
         return os.path.join(self.root, self.__class__.__name__, 'noise')
+
+    @property
+    def processed_folder(self):
+        """Folder for the processed data.
+        """
+        return os.path.join(self.root, self.__class__.__name__, 'processed')
 
     def __parse_quantization(self, quantization_scheme):
         if quantization_scheme:
@@ -159,8 +172,9 @@ class KWS:
 
         if self.__check_exists():
             return
-        
+
         self.__makedir_exist_ok(self.raw_folder)
+        self.__makedir_exist_ok(self.processed_folder)
 
         # download Speech Command
         filename = self.url_speechcommand.rpartition('/')[2]
@@ -177,121 +191,11 @@ class KWS:
         # convert the LibriSpeech audio files to 1-sec 16KHz .wav, stored under raw/librispeech
         self.__resample_convert_wav(folder_in=self.librispeech_folder,
                                     folder_out=os.path.join(self.raw_folder, 'librispeech'))
-        
+
+        self.__gen_datasets()
 
     def __check_exists(self):
-        return os.path.exists(self.librispeech_folder)
-
-    #added function
-    #trying to create the folders without augmentation
-    def __gen_datasets(self, exp_len=16384):
-        with warnings.catch_warnings():
-            warnings.simplefilter('error')
-
-            lst = sorted(os.listdir(self.raw_folder))
-            labels = [d for d in lst if os.path.isdir(os.path.join(self.raw_folder, d))
-                      and d[0].isalpha()]
-
-            train_count = 0
-            test_count = 0
-
-            for i, label in enumerate(labels):
-
-                print(f'Processing the label: {label}. {i + 1} of {len(labels)}')
-                record_list = sorted(os.listdir(os.path.join(self.raw_folder, label)))
-                record_len = len(record_list)
-
-                if not self.save_unquantized:
-                    data_in = np.empty((record_len,
-                                        exp_len), dtype=np.uint8)
-                else:
-                    data_in = np.empty((record_len,
-                                        exp_len), dtype=np.float32)
-                    
-
-                data_type = np.empty((record_len, 1),
-                                     dtype=np.uint8)
-                # create data classes
-                data_class = np.full((record_len, 1), i,
-                                     dtype=np.uint8)
-
-                time_s = time.time()
-                
-                for r, record_name in enumerate(record_list):
- 
-                    record_hash = hash(record_name) % 10
- 
-                    if record_hash < 9:
-                        d_typ = np.uint8(0)  # train
-                        train_count += 1
-                    else:
-                        d_typ = np.uint8(1)  # test
-                        test_count += 1
-
-                    record_pth = os.path.join(self.raw_folder, label, record_name)
-                    record, fs = librosa.load(record_pth, offset=0, sr=None)
-                    
-                    record = np.pad(record, [0, exp_len - record.size])
-
-                    data_type[r , 0] = d_typ
-
-                    if not self.save_unquantized:
-                            data_in[r] = \
-                                KWS.quantize_audio(record,
-                                                    num_bits=self.quantization['bits'],
-                                                    compand=self.quantization['compand'],
-                                                    mu=self.quantization['mu'])
-                    else:        
-                        data_in[r] = record
-
-                dur = time.time() - time_s
-                print(f'Finished in {dur:.3f} seconds.')
-                if i == 0:
-                    data_in_all = data_in.copy()
-                    data_class_all = data_class.copy()
-                    data_type_all = data_type.copy()
-                else:
-                    data_in_all = np.concatenate((data_in_all, data_in), axis=0)
-                    data_class_all = np.concatenate((data_class_all, data_class), axis=0)
-                    data_type_all = np.concatenate((data_type_all, data_type), axis=0)
-
-            data_in_all = torch.from_numpy(data_in_all)
-            data_class_all = torch.from_numpy(data_class_all)
-            data_type_all = torch.from_numpy(data_type_all)
-
-            raw_dataset = (data_in_all, data_class_all, data_type_all)
-
-        print(f'Training+Validation: {train_count},  Test: {test_count}')    
-        return raw_dataset
-            
-    #added function
-    #dynamic augmentation application
-    def __dynamic_augment(self, record, fs = 16000, verbose=False, exp_len=16384, row_len=128, overlap_ratio=0):
-
-        audio = self.augment(record, fs)
-        audio = np.array(audio, np.uint8)
-        
-        overlap = int(np.ceil(row_len * overlap_ratio))
-        num_rows = int(np.ceil(exp_len / (row_len - overlap)))
-        data_len = int((num_rows * row_len - (num_rows - 1) * overlap))
-
-        if not self.save_unquantized:
-                    data_in = np.empty((row_len, num_rows), dtype=np.uint8)
-        else:
-            data_in = np.empty((row_len, num_rows), dtype=np.float32)
-            
-        for n_r in range(num_rows):
-            start_idx = n_r * (row_len - overlap)
-            end_idx = start_idx + row_len
-            audio_chunk = audio[start_idx:end_idx]
-            audio_chunk = np.pad(audio_chunk, [0, row_len - audio_chunk.size])
-            
-            data_in[:, n_r] = audio_chunk
-
-        data_in = torch.from_numpy(data_in)
-            
-        return data_in
-
+        return os.path.exists(os.path.join(self.processed_folder, self.data_file))
 
     def __makedir_exist_ok(self, dirpath):
         try:
@@ -464,7 +368,6 @@ class KWS:
         self.data = self.data[idx_to_select, :]
         self.targets = self.targets[idx_to_select, :]
         del self.data_type
-        
 
     def __filter_classes(self):
         initial_new_class_label = len(self.class_dict)
@@ -487,17 +390,11 @@ class KWS:
         return len(self.data)
 
     def __getitem__(self, index):
-        inp, target = self.data[index], int(self.targets[index])
-
-        inp = self.__dynamic_augment(inp)
-
-        inp = inp.type(torch.FloatTensor)
-
+        inp, target = self.data[index].type(torch.FloatTensor), int(self.targets[index])
         if not self.save_unquantized:
             inp /= 256
         if self.transform is not None:
             inp = self.transform(inp)
-        
         return inp, target
 
     @staticmethod
@@ -586,7 +483,112 @@ class KWS:
             q_data = np.clip(q_data, 0, max_val)
         return np.uint8(q_data)
 
-    
+    def __gen_datasets(self, exp_len=16384, row_len=128, overlap_ratio=0):
+        print('Generating dataset from raw data samples for the first time. ')
+        print('This process will take significant time (~60 minutes)...')
+        with warnings.catch_warnings():
+            warnings.simplefilter('error')
+
+            lst = sorted(os.listdir(self.raw_folder))
+            labels = [d for d in lst if os.path.isdir(os.path.join(self.raw_folder, d))
+                      and d[0].isalpha()]
+
+            # PARAMETERS
+            overlap = int(np.ceil(row_len * overlap_ratio))
+            num_rows = int(np.ceil(exp_len / (row_len - overlap)))
+            data_len = int((num_rows * row_len - (num_rows - 1) * overlap))
+            print(f'data_len: {data_len}')
+
+            # show the size of dataset for each keyword
+            print('------------- Label Size ---------------')
+            for i, label in enumerate(labels):
+                record_list = os.listdir(os.path.join(self.raw_folder, label))
+                print(f'{label:8s}:  \t{len(record_list)}')
+            print('------------------------------------------')
+
+            for i, label in enumerate(labels):
+                print(f'Processing the label: {label}. {i + 1} of {len(labels)}')
+                record_list = sorted(os.listdir(os.path.join(self.raw_folder, label)))
+
+                # dimension: row_length x number_of_rows
+                if not self.save_unquantized:
+                    data_in = np.empty(((self.augmentation['aug_num'] + 1) * len(record_list),
+                                        row_len, num_rows), dtype=np.uint8)
+                else:
+                    data_in = np.empty(((self.augmentation['aug_num'] + 1) * len(record_list),
+                                        row_len, num_rows), dtype=np.float32)
+                data_type = np.empty(((self.augmentation['aug_num'] + 1) * len(record_list), 1),
+                                     dtype=np.uint8)
+                # create data classes
+                data_class = np.full(((self.augmentation['aug_num'] + 1) * len(record_list), 1), i,
+                                     dtype=np.uint8)
+
+                time_s = time.time()
+                train_count = 0
+                test_count = 0
+                for r, record_name in enumerate(record_list):
+                    if r % 1000 == 0:
+                        print(f'\t{r + 1} of {len(record_list)}')
+
+                    if hash(record_name) % 10 < 9:
+                        d_typ = np.uint8(0)  # train+val
+                        train_count += 1
+                    else:
+                        d_typ = np.uint8(1)  # test
+                        test_count += 1
+
+                    record_pth = os.path.join(self.raw_folder, label, record_name)
+                    record, fs = librosa.load(record_pth, offset=0, sr=None)
+                    audio_seq_list = self.augment_multiple(record, fs,
+                                                           self.augmentation['aug_num'])
+                    for n_a, audio_seq in enumerate(audio_seq_list):
+                        # store set type: train+validate or test
+                        data_type[(self.augmentation['aug_num'] + 1) * r + n_a, 0] = d_typ
+
+                        # Write audio 128x128=16384 samples without overlap
+                        for n_r in range(num_rows):
+                            start_idx = n_r * (row_len - overlap)
+                            end_idx = start_idx + row_len
+                            audio_chunk = audio_seq[start_idx:end_idx]
+                            # pad zero if the length of the chunk is smaller than row_len
+                            audio_chunk = np.pad(audio_chunk, [0, row_len - audio_chunk.size])
+                            # store input data after quantization
+                            data_idx = (self.augmentation['aug_num'] + 1) * r + n_a
+                            if not self.save_unquantized:
+                                data_in[data_idx, :, n_r] = \
+                                    KWS.quantize_audio(audio_chunk,
+                                                       num_bits=self.quantization['bits'],
+                                                       compand=self.quantization['compand'],
+                                                       mu=self.quantization['mu'])
+                            else:
+                                data_in[data_idx, :, n_r] = audio_chunk
+
+                dur = time.time() - time_s
+                print(f'Finished in {dur:.3f} seconds.')
+                print(data_in.shape)
+                time_s = time.time()
+                if i == 0:
+                    data_in_all = data_in.copy()
+                    data_class_all = data_class.copy()
+                    data_type_all = data_type.copy()
+                else:
+                    data_in_all = np.concatenate((data_in_all, data_in), axis=0)
+                    data_class_all = np.concatenate((data_class_all, data_class), axis=0)
+                    data_type_all = np.concatenate((data_type_all, data_type), axis=0)
+                dur = time.time() - time_s
+                print(f'Data concatenation finished in {dur:.3f} seconds.')
+
+            data_in_all = torch.from_numpy(data_in_all)
+            data_class_all = torch.from_numpy(data_class_all)
+            data_type_all = torch.from_numpy(data_type_all)
+
+            mfcc_dataset = (data_in_all, data_class_all, data_type_all)
+            torch.save(mfcc_dataset, os.path.join(self.processed_folder, self.data_file))
+
+        print('Dataset created.')
+        print(f'Training+Validation: {train_count},  Test: {test_count}')
+
+
 class KWS_20(KWS):
     """
     `SpeechCom v0.02 <http://download.tensorflow.org/data/speech_commands_v0.02.tar.gz>`
@@ -608,7 +610,7 @@ def KWS_get_datasets(data, load_train=True, load_test=True, num_classes=6):
     dataset is used to form the last class, i.e class of the unknowns.
     To further improve the detection of unknown words, the librispeech dataset is also downloaded
     and converted to 1 second segments to be used as unknowns as well.
-    The dataset is split into training, validation and test sets. 80:10:10 training:validation:test
+    The dataset is split into training+validation and test sets. 90:10 training+validation:test
     split is used by default.
 
     Data is augmented to 3x duplicate data by random stretch/shift and randomly adding noise where
@@ -628,7 +630,7 @@ def KWS_get_datasets(data, load_train=True, load_test=True, num_classes=6):
         raise ValueError(f'Unsupported num_classes {num_classes}')
 
     augmentation = {'aug_num': 2, 'shift': {'min': -0.15, 'max': 0.15},
-                    'noise_var': {'min': 0, 'max': 1}}
+                    'noise_var': {'min': 0, 'max': 1.0}}
     quantization_scheme = {'compand': False, 'mu': 10}
 
     if load_train:
@@ -651,8 +653,8 @@ def KWS_get_datasets(data, load_train=True, load_test=True, num_classes=6):
         test_dataset = None
 
     return train_dataset, test_dataset
- 
- 
+
+
 def KWS_20_get_datasets(data, load_train=True, load_test=True):
     """
     Load the folded 1D version of SpeechCom dataset for 20 classes
@@ -664,7 +666,7 @@ def KWS_20_get_datasets(data, load_train=True, load_test=True):
     i.e class of the unknowns.
     To further improve the detection of unknown words, the librispeech dataset is also downloaded
     and converted to 1 second segments to be used as unknowns as well.
-    The dataset is split into training, validation and test sets. 80:10:10 training:validation:test
+    The dataset is split into training+validation and test sets. 90:10 training+validation:test
     split is used by default.
 
     Data is augmented to 3x duplicate data by random stretch/shift and randomly adding noise where
@@ -672,8 +674,8 @@ def KWS_20_get_datasets(data, load_train=True, load_test=True):
     0.8 and 1.3, -0.1 and 0.1, 0 and 1, respectively.
     """
     return KWS_get_datasets(data, load_train, load_test, num_classes=20)
- 
- 
+
+
 def KWS_get_unquantized_datasets(data, load_train=True, load_test=True, num_classes=6):
     """
     Load the folded 1D version of SpeechCom dataset without quantization and augmentation
@@ -714,8 +716,8 @@ def KWS_get_unquantized_datasets(data, load_train=True, load_test=True, num_clas
         test_dataset = None
 
     return train_dataset, test_dataset
- 
- 
+
+
 def KWS_35_get_unquantized_datasets(data, load_train=True, load_test=True):
     """
     Load the folded 1D version of unquantized SpeechCom dataset for 35 classes.
