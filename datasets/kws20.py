@@ -93,7 +93,7 @@ class KWS:
 
         if download:
             self.__download()
-            
+
         self.data, self.targets, self.data_type = self.__gen_datasets()
 
         print(f'\nProcessing {self.d_type}...')
@@ -178,12 +178,11 @@ class KWS:
         self.__resample_convert_wav(folder_in=self.librispeech_folder,
                                     folder_out=os.path.join(self.raw_folder, 'librispeech'))
 
-
     def __check_exists(self):
         return os.path.exists(self.librispeech_folder)
 
-    #added function
-    #trying to create the folders without augmentation
+    # added function
+    # trying to create the folders without augmentation
     def __gen_datasets(self, exp_len=16384):
         with warnings.catch_warnings():
             warnings.simplefilter('error')
@@ -203,7 +202,6 @@ class KWS:
 
                 data_in = np.empty((record_len,
                                         exp_len), dtype=np.float32)
-                           
 
                 data_type = np.empty((record_len, 1),
                                      dtype=np.uint8)
@@ -226,7 +224,6 @@ class KWS:
 
                     record_pth = os.path.join(self.raw_folder, label, record_name)
                     record = librosa.load(record_pth, offset=0, sr=None)
-                    
                     record = np.pad(record, [0, exp_len - record.size])
 
                     data_type[r , 0] = d_typ
@@ -252,17 +249,17 @@ class KWS:
         print(f'Training+Validation: {train_count},  Test: {test_count}')
         return raw_dataset
 
-    #added function
-    #dynamic augmentation application
-    def __dynamic_augment(self, record, fs = 16000):
+    # added function
+    # dynamic augmentation application
+    def __dynamic_augment(self, record, fs=16000):
 
         audio = self.augment(record, fs)
         data_in = self.reshape_file(audio)
 
         return data_in
 
-    def reshape_file(self, audio, row_len = 128, exp_len=16384, overlap_ratio=0):
-        
+    def reshape_file(self, audio, row_len=128, exp_len=16384, overlap_ratio=0):
+
         overlap = int(np.ceil(row_len * overlap_ratio))
         num_rows = int(np.ceil(exp_len / (row_len - overlap)))
 
@@ -280,15 +277,14 @@ class KWS:
             if not self.save_unquantized:
                 data_in[:, n_r] = \
                     KWS.quantize_audio(audio_chunk,
-                                        num_bits=self.quantization['bits'],
-                                        compand=self.quantization['compand'],
-                                        mu=self.quantization['mu'])
+                                    num_bits=self.quantization['bits'],
+                                    compand=self.quantization['compand'],
+                                    mu=self.quantization['mu'])
             else:
                 data_in[:, n_r] = audio_chunk
 
         data_in = torch.from_numpy(data_in)
         return data_in
-
 
     def __makedir_exist_ok(self, dirpath):
         try:
@@ -460,8 +456,7 @@ class KWS:
 
         self.data = self.data[idx_to_select, :]
         self.targets = self.targets[idx_to_select, :]
-        self.data_type = self.data_type[idx_to_select, :]
-        
+        self.data_type = self.data_type[idx_to_select, :]      
 
     def __filter_classes(self):
         initial_new_class_label = len(self.class_dict)
@@ -497,7 +492,7 @@ class KWS:
             inp /= 256
         if self.transform is not None:
             inp = self.transform(inp)
-        
+
         return inp, target
 
     @staticmethod
@@ -519,7 +514,7 @@ class KWS:
     @staticmethod
     def stretch(audio, rate=1):
         """Stretches audio with specified ratio.
-        """ 
+        """
         input_length = 16000
         audio2 = librosa.effects.time_stretch(audio, rate)
         if len(audio2) > input_length:
@@ -528,11 +523,10 @@ class KWS:
             audio2 = np.pad(audio2, (0, max(0, input_length - len(audio2))), "constant")
 
         return audio2
-    
+
     @staticmethod
     def stretch_(audio, rate=1):
         return torch.from_numpy(tsm.wsola(audio, rate))
-
 
     def augment(self, audio, verbose=False):
         """Augments audio by adding random noise, shift and stretch ratio.
@@ -545,18 +539,17 @@ class KWS:
                                                 self.augmentation['stretch']['max'])
 
         augment_methods = {
-            "noise_var":  [self.add_white_noise, random_noise_var_coeff],
-            "shift": [self.shift, random_shift_time],
-            "stretch": [self.stretch_, random_stretch_coeff]
+                "noise_var":  [self.add_white_noise, random_noise_var_coeff],
+                "shift": [self.shift, random_shift_time],
+                "stretch": [self.stretch_, random_stretch_coeff]
         }
 
-        for option, (aug_func, param) in augment_methods.items():
+        for (aug_func, param) in augment_methods.items():
             # %66 possibility to apply an augmentation
             if np.random.randint(3) > 0:
                 audio = aug_func(audio, param)
             else:
                 continue
-
 
         if verbose:
             print(f'random_noise_var_coeff: {random_noise_var_coeff:.2f}\nrandom_shift_time: \
@@ -602,7 +595,6 @@ class KWS:
             q_data = np.clip(q_data, 0, max_val)
         return np.uint8(q_data)
 
-
 class KWS_20(KWS):
     """
     `SpeechCom v0.02 <http://download.tensorflow.org/data/speech_commands_v0.02.tar.gz>`
@@ -611,7 +603,6 @@ class KWS_20(KWS):
 
     def __str__(self):
         return self.__class__.__name__
-
 
 def KWS_get_datasets(data, load_train=True, load_test=True, num_classes=6):
     """
@@ -668,7 +659,6 @@ def KWS_get_datasets(data, load_train=True, load_test=True, num_classes=6):
 
     return train_dataset, test_dataset
 
-
 def KWS_20_get_datasets(data, load_train=True, load_test=True):
     """
     Load the folded 1D version of SpeechCom dataset for 20 classes
@@ -688,7 +678,6 @@ def KWS_20_get_datasets(data, load_train=True, load_test=True):
     0.8 and 1.3, -0.1 and 0.1, 0 and 1, respectively.
     """
     return KWS_get_datasets(data, load_train, load_test, num_classes=20)
-
 
 def KWS_get_unquantized_datasets(data, load_train=True, load_test=True, num_classes=6):
     """
@@ -731,13 +720,11 @@ def KWS_get_unquantized_datasets(data, load_train=True, load_test=True, num_clas
 
     return train_dataset, test_dataset
 
-
 def KWS_35_get_unquantized_datasets(data, load_train=True, load_test=True):
     """
     Load the folded 1D version of unquantized SpeechCom dataset for 35 classes.
     """
     return KWS_get_unquantized_datasets(data, load_train, load_test, num_classes=35)
-
 
 datasets = [
     {
