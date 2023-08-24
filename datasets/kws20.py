@@ -201,7 +201,7 @@ class KWS:
                 record_len = len(record_list)
 
                 data_in = np.empty((record_len,
-                                        exp_len), dtype=np.float32)
+                                    exp_len), dtype=np.float32)
 
                 data_type = np.empty((record_len, 1),
                                      dtype=np.uint8)
@@ -226,7 +226,7 @@ class KWS:
                     record = librosa.load(record_pth, offset=0, sr=None)
                     record = np.pad(record, [0, exp_len - record.size])
 
-                    data_type[r , 0] = d_typ
+                    data_type[r, 0] = d_typ
                     data_in[r] = record
 
                 dur = time.time() - time_s
@@ -277,9 +277,9 @@ class KWS:
             if not self.save_unquantized:
                 data_in[:, n_r] = \
                     KWS.quantize_audio(audio_chunk,
-                                    num_bits=self.quantization['bits'],
-                                    compand=self.quantization['compand'],
-                                    mu=self.quantization['mu'])
+                                      num_bits=self.quantization['bits'],
+                                      compand=self.quantization['compand'],
+                                      mu=self.quantization['mu'])
             else:
                 data_in[:, n_r] = audio_chunk
 
@@ -456,7 +456,7 @@ class KWS:
 
         self.data = self.data[idx_to_select, :]
         self.targets = self.targets[idx_to_select, :]
-        self.data_type = self.data_type[idx_to_select, :]      
+        self.data_type = self.data_type[idx_to_select, :]
 
     def __filter_classes(self):
         initial_new_class_label = len(self.class_dict)
@@ -536,7 +536,7 @@ class KWS:
         random_shift_time = np.random.uniform(self.augmentation['shift']['min'],
                                               self.augmentation['shift']['max'])
         random_stretch_coeff = np.random.uniform(self.augmentation['stretch']['min'],
-                                                self.augmentation['stretch']['max'])
+                                                 self.augmentation['stretch']['max'])
 
         augment_methods = {
                 "noise_var":  [self.add_white_noise, random_noise_var_coeff],
@@ -595,6 +595,7 @@ class KWS:
             q_data = np.clip(q_data, 0, max_val)
         return np.uint8(q_data)
 
+
 class KWS_20(KWS):
     """
     `SpeechCom v0.02 <http://download.tensorflow.org/data/speech_commands_v0.02.tar.gz>`
@@ -603,6 +604,7 @@ class KWS_20(KWS):
 
     def __str__(self):
         return self.__class__.__name__
+
 
 def KWS_get_datasets(data, load_train=True, load_test=True, num_classes=6):
     """
@@ -659,6 +661,7 @@ def KWS_get_datasets(data, load_train=True, load_test=True, num_classes=6):
 
     return train_dataset, test_dataset
 
+
 def KWS_20_get_datasets(data, load_train=True, load_test=True):
     """
     Load the folded 1D version of SpeechCom dataset for 20 classes
@@ -678,6 +681,7 @@ def KWS_20_get_datasets(data, load_train=True, load_test=True):
     0.8 and 1.3, -0.1 and 0.1, 0 and 1, respectively.
     """
     return KWS_get_datasets(data, load_train, load_test, num_classes=20)
+
 
 def KWS_get_unquantized_datasets(data, load_train=True, load_test=True, num_classes=6):
     """
@@ -720,11 +724,13 @@ def KWS_get_unquantized_datasets(data, load_train=True, load_test=True, num_clas
 
     return train_dataset, test_dataset
 
+
 def KWS_35_get_unquantized_datasets(data, load_train=True, load_test=True):
     """
     Load the folded 1D version of unquantized SpeechCom dataset for 35 classes.
     """
     return KWS_get_unquantized_datasets(data, load_train, load_test, num_classes=35)
+
 
 datasets = [
     {
