@@ -1,0 +1,73 @@
+#!/usr/bin/env python3
+
+"""
+Training+validation log parser
+"""
+
+import re
+import matplotlib.pyplot as plt
+
+def log_parser(log_path, plot_loss = True, plot_acc = True):# Regular expressions to extract relevant information
+
+    # Target values to locate
+    epoch_pattern = re.compile(r'Epoch: \[(\d+)\]')
+    loss_pattern = re.compile(r'Overall Loss (\d+\.\d+)')
+    validation_loss_pattern = re.compile(r'Loss\s*([\d.]+)')
+    top1_pattern = r'Top1\s*([\d.]+)'
+
+    # Open and read the log file
+    with open(log_path, 'r') as log_file:
+        log_contents = log_file.read()
+
+    # Find corresponding values
+    epoch_matches = re.findall(epoch_pattern, log_contents)
+    loss_matches = re.findall(loss_pattern, log_contents)
+    validation_loss_matches = re.findall(validation_loss_pattern, log_contents)
+    top1_matches = re.findall(top1_pattern, log_contents)
+
+    # Convert extracted data to appropriate data types
+    epochs = [int(match) for match in epoch_matches]
+    losses = [float(match) for match in loss_matches]
+    validation_losses = [float(match) for match in validation_loss_matches]
+    top1_accuracies = [float(match) for match in top1_matches]
+
+    # Make sure training and validation losses have the same length
+    min_length = min(len(losses), len(validation_losses))
+    epochs = epochs[:min_length]
+    training_losses = losses[:min_length]
+    validation_losses = validation_losses[:min_length]
+
+    # Make sure training and validation losses have the same length
+    top1_length = min(len(epochs), len(top1_accuracies))
+    top1_epochs = epochs[:top1_length]
+    top1_accuracies = top1_accuracies[:top1_length]
+
+    # Plot training + val loss vs epoch
+    if plot_loss:
+        plt.plot(epochs, losses, label='Training Loss')
+        plt.plot(epochs, validation_losses, label='Validation Loss',color="r")
+        plt.legend(loc="upper right")
+        plt.xlabel('Epoch')
+        plt.ylabel('Objective Loss')
+        plt.title('Training Objective Loss Over Epochs')
+        plt.grid(True)
+        plt.show()
+
+    # Plot top1 acc  vs epoch
+    if plot_acc:
+        plt.figure(figsize=(10, 5))
+        plt.scatter(top1_epochs, top1_accuracies, label='Top-1 Accuracy')
+        plt.xlabel('Epoch')
+        plt.ylabel('Top-1 Accuracy (%)')
+        plt.title('Top-1 Accuracy vs Epoch')
+        plt.grid(True)
+        plt.legend()
+        plt.show()
+        
+    return 0
+
+    
+
+
+
+
