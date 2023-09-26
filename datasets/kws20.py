@@ -54,7 +54,7 @@ class KWS:
     root (string): Root directory of dataset where ``KWS/processed/dataset.pt``
         exist.
     classes(array): List of keywords to be used.
-    d_type(string): Option for the created dataset. ``train``, ``val``  or ``test``.
+    d_type(string): Option for the created dataset. ``train`` or ``test``.
     n_augment(int, optional): Number of augmented samples added to the dataset from
         each sample by random modifications, i.e. stretching, shifting and random noise.
     transform (callable, optional): A function/transform that takes in an PIL image
@@ -112,12 +112,6 @@ class KWS:
         """
         return os.path.join(self.root, self.__class__.__name__, 'librispeech')
 
-    @property
-    def noise_folder(self):
-        """Folder for the different noise data.
-        """
-        return os.path.join(self.root, self.__class__.__name__, 'noise')
-
     def __parse_quantization(self, quantization_scheme):
         if quantization_scheme:
             self.quantization = quantization_scheme
@@ -160,6 +154,7 @@ class KWS:
         if self.__check_exists():
             return
 
+        self.__makedir_exist_ok(self.librispeech_folder)
         self.__makedir_exist_ok(self.raw_folder)
 
         # download Speech Command
@@ -178,11 +173,11 @@ class KWS:
         self.__resample_convert_wav(folder_in=self.librispeech_folder,
                                     folder_out=os.path.join(self.raw_folder, 'librispeech'))
 
-    def __check_exists(self):
-        return os.path.exists(self.librispeech_folder)
 
-    # added function
-    # trying to create the folders without augmentation
+    def __check_exists(self):
+        return (os.path.exists(self.librispeech_folder) and os.path.exists(self.raw_folder))
+
+    # create the folders without augmentation
     def __gen_datasets(self, exp_len=16384):
         with warnings.catch_warnings():
             warnings.simplefilter('error')
@@ -200,8 +195,13 @@ class KWS:
                 record_list = sorted(os.listdir(os.path.join(self.raw_folder, label)))
                 record_len = len(record_list)
 
-                data_in = np.empty((record_len,
-                                    exp_len), dtype=np.float32)
+                if self.save_unquantized:
+                    data_in = np.empty((record_len,
+                                        exp_len), dtype=np.uint8)
+                else:
+                    data_in = np.empty((record_len,
+                                        exp_len), dtype=np.float32)
+                    
 
                 data_type = np.empty((record_len, 1),
                                      dtype=np.uint8)
@@ -216,17 +216,18 @@ class KWS:
                     record_hash = hash(record_name) % 10
 
                     if record_hash < 9:
-                        d_typ = np.uint8(0)  # train
+                        d_typ = np.uint8(0)  # train + val
                         train_count += 1
                     else:
                         d_typ = np.uint8(1)  # test
                         test_count += 1
 
                     record_pth = os.path.join(self.raw_folder, label, record_name)
-                    record = librosa.load(record_pth, offset=0, sr=None)
+                    record, fs = librosa.load(record_pth, offset=0, sr=None)
+                    
                     record = np.pad(record, [0, exp_len - record.size])
 
-                    data_type[r, 0] = d_typ
+                    data_type[r , 0] = d_typ
                     data_in[r] = record
 
                 dur = time.time() - time_s
@@ -249,17 +250,17 @@ class KWS:
         print(f'Training+Validation: {train_count},  Test: {test_count}')
         return raw_dataset
 
-    # added function
     # dynamic augmentation application
-    def __dynamic_augment(self, record, fs=16000):
+    def __dynamic_augment(self, record, fs = 16000, verbose=False, exp_len=16384, row_len=128, overlap_ratio=0):
 
         audio = self.augment(record, fs)
         data_in = self.reshape_file(audio)
-
         return data_in
 
     def reshape_file(self, audio, row_len=128, exp_len=16384, overlap_ratio=0):
-
+        """ Reshaping sizes of the records and quantize
+        """
+        
         overlap = int(np.ceil(row_len * overlap_ratio))
         num_rows = int(np.ceil(exp_len / (row_len - overlap)))
 
@@ -267,7 +268,7 @@ class KWS:
             data_in = np.empty((row_len, num_rows), dtype=np.uint8)
         else:
             data_in = np.empty((row_len, num_rows), dtype=np.float32)
-
+        
         for n_r in range(num_rows):
             start_idx = n_r * (row_len - overlap)
             end_idx = start_idx + row_len
@@ -277,9 +278,9 @@ class KWS:
             if not self.save_unquantized:
                 data_in[:, n_r] = \
                     KWS.quantize_audio(audio_chunk,
-                                      num_bits=self.quantization['bits'],
-                                      compand=self.quantization['compand'],
-                                      mu=self.quantization['mu'])
+                                        num_bits=self.quantization['bits'],
+                                        compand=self.quantization['compand'],
+                                        mu=self.quantization['mu'])
             else:
                 data_in[:, n_r] = audio_chunk
 
@@ -495,13 +496,14 @@ class KWS:
 
         return inp, target
 
+
     @staticmethod
     def add_white_noise(audio, noise_var_coeff):
         """Adds zero mean Gaussian noise to image with specified variance.
         """
-        audio_mean = torch.mean(torch.abs(audio))
-        coeff = noise_var_coeff * audio_mean
-        noisy_audio = audio + coeff * torch.randn(len(audio))
+        audio = np.array(audio)
+        coeff = noise_var_coeff * np.mean(np.abs(audio).astype(np.float32))
+        noisy_audio = audio + coeff * np.random.randn(len(audio))
         return noisy_audio
 
     @staticmethod
@@ -509,42 +511,56 @@ class KWS:
         """Shifts audio.
         """
         shift_count = int(shift_sec * fs)
-        return torch.roll(audio, shift_count)
+        return np.roll(audio, shift_count)
 
-    @staticmethod
-    def stretch(audio, rate=1):
+    def stretch(self, audio, random_stretch_coeff, rate=1, fs=16000):
         """Stretches audio with specified ratio.
         """
-        input_length = 16000
-        audio2 = librosa.effects.time_stretch(audio, rate)
-        if len(audio2) > input_length:
-            audio2 = audio2[:input_length]
-        else:
-            audio2 = np.pad(audio2, (0, max(0, input_length - len(audio2))), "constant")
+        audio = np.array(audio, dtype=np.float32)
+        aug_audio = tsm.wsola(audio, random_stretch_coeff)
+        start_pt, end_pt = self.energy_detector(aug_audio)
 
-        return audio2
+        self.augmentation['shift']['min'] = (-1) * (start_pt / fs)
+        self.augmentation['shift']['max'] = ((len(aug_audio) - end_pt) / fs)
 
-    @staticmethod
-    def stretch_(audio, rate=1):
-        return torch.from_numpy(tsm.wsola(audio, rate))
+        return aug_audio
 
-    def augment(self, audio, verbose=False):
+    def energy_detector(self, audio):
+
+        audio_f_spec = np.fft.rfft(audio)
+        audio_psd = np.abs(audio_f_spec)
+        threshold = audio_psd.mean()
+        audio_f_spec[audio_psd < threshold] = 0
+        inv_fft = np.fft.irfft(audio_f_spec)
+
+        fft = np.array(inv_fft, dtype = np.float32)
+        fft_threshold = abs(fft).mean()
+
+        start_pt = np.argmax(abs(fft) > fft_threshold)
+        reversed_fft = np.flip(abs(fft))
+        end_pt = len(audio) - np.argmax(reversed_fft > fft_threshold)
+
+        return start_pt, end_pt
+
+    def augment(self, audio, fs, verbose=False):
         """Augments audio by adding random noise, shift and stretch ratio.
         """
         random_noise_var_coeff = np.random.uniform(self.augmentation['noise_var']['min'],
                                                    self.augmentation['noise_var']['max'])
+        
+        random_stretch_coeff = np.random.uniform(self.augmentation['stretch']['min'],
+                                                self.augmentation['stretch']['max'])
+
         random_shift_time = np.random.uniform(self.augmentation['shift']['min'],
                                               self.augmentation['shift']['max'])
-        random_stretch_coeff = np.random.uniform(self.augmentation['stretch']['min'],
-                                                 self.augmentation['stretch']['max'])
 
         augment_methods = {
-                "noise_var":  [self.add_white_noise, random_noise_var_coeff],
+                "stretch": [self.stretch, random_stretch_coeff],
                 "shift": [self.shift, random_shift_time],
-                "stretch": [self.stretch_, random_stretch_coeff]
+                "noise_var": [self.add_white_noise, random_noise_var_coeff]
         }
 
-        for (aug_func, param) in augment_methods.items():
+        for (aug_func, param) in augment_methods.values():
             # %66 possibility to apply an augmentation
             if np.random.randint(3) > 0:
                 audio = aug_func(audio, param)
@@ -555,14 +571,6 @@ class KWS:
             print(f'random_noise_var_coeff: {random_noise_var_coeff:.2f}\nrandom_shift_time: \
                     {random_shift_time:.2f}\nrandom_stretch_coeff: {random_stretch_coeff:.2f}')
         return audio
-
-    def augment_multiple(self, audio, fs, n_augment, verbose=False):
-        """Calls `augment` function for n_augment times for given audio data.
-        Finally the original audio is added to have (n_augment+1) audio data.
-        """
-        aug_audio = [self.augment(audio, fs, verbose=verbose) for i in range(n_augment)]
-        aug_audio.insert(0, audio)
-        return aug_audio
 
     @staticmethod
     def compand(data, mu=255):
@@ -617,7 +625,7 @@ def KWS_get_datasets(data, load_train=True, load_test=True, num_classes=6):
     dataset is used to form the last class, i.e class of the unknowns.
     To further improve the detection of unknown words, the librispeech dataset is also downloaded
     and converted to 1 second segments to be used as unknowns as well.
-    The dataset is split into training, validation and test sets. 80:10:10 training:validation:test
+    The dataset is split into training+validation and test sets. 90:10 training+validation:test
     split is used by default.
 
     Data is augmented to 3x duplicate data by random stretch/shift and randomly adding noise where
@@ -637,7 +645,7 @@ def KWS_get_datasets(data, load_train=True, load_test=True, num_classes=6):
         raise ValueError(f'Unsupported num_classes {num_classes}')
 
     augmentation = {'aug_num': 2, 'shift': {'min': -0.15, 'max': 0.15},
-                    'noise_var': {'min': 0, 'max': 0.05}}
+                    'noise_var': {'min': 0, 'max': 1}}
     quantization_scheme = {'compand': False, 'mu': 10}
 
     if load_train:
@@ -673,7 +681,7 @@ def KWS_20_get_datasets(data, load_train=True, load_test=True):
     i.e class of the unknowns.
     To further improve the detection of unknown words, the librispeech dataset is also downloaded
     and converted to 1 second segments to be used as unknowns as well.
-    The dataset is split into training, validation and test sets. 80:10:10 training:validation:test
+    The dataset is split into training+validation and test sets. 90:10 training+validation:test
     split is used by default.
 
     Data is augmented to 3x duplicate data by random stretch/shift and randomly adding noise where
