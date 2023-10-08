@@ -88,6 +88,7 @@ class KWS:
         self.transform = transform
         self.save_unquantized = save_unquantized
         self.noise = np.empty(shape=[0, 0])
+
         self.__parse_quantization(quantization_scheme)
         self.__parse_augmentation(augmentation)
 
@@ -173,7 +174,6 @@ class KWS:
         self.__resample_convert_wav(folder_in=self.librispeech_folder,
                                     folder_out=os.path.join(self.raw_folder, 'librispeech'))
 
-
     def __check_exists(self):
         return (os.path.exists(self.librispeech_folder) and os.path.exists(self.raw_folder))
 
@@ -186,8 +186,15 @@ class KWS:
             labels = [d for d in lst if os.path.isdir(os.path.join(self.raw_folder, d))
                       and d[0].isalpha()]
 
+            # read testing_list.txt & validation_list.txt into sets for fast access
+            with open(os.path.join(self.raw_folder, 'testing_list.txt'), encoding="utf-8") as f:
+                testing_set = set(f.read().splitlines())
+            with open(os.path.join(self.raw_folder, 'validation_list.txt'), encoding="utf-8") as f:
+                validation_set = set(f.read().splitlines())
+
             train_count = 0
             test_count = 0
+            valid_count = 0
 
             for i, label in enumerate(labels):
 
@@ -201,7 +208,6 @@ class KWS:
                 else:
                     data_in = np.empty((record_len,
                                         exp_len), dtype=np.float32)
-                    
 
                 data_type = np.empty((record_len, 1),
                                      dtype=np.uint8)
@@ -213,21 +219,23 @@ class KWS:
 
                 for r, record_name in enumerate(record_list):
 
-                    record_hash = hash(record_name) % 10
+                    local_filename = os.path.join(label, record_name)
 
-                    if record_hash < 9:
-                        d_typ = np.uint8(0)  # train + val
-                        train_count += 1
-                    else:
+                    if local_filename in testing_set:
                         d_typ = np.uint8(1)  # test
                         test_count += 1
+                    elif local_filename in validation_set:
+                        d_typ = np.uint8(2)  # val
+                        valid_count += 1
+                    else:
+                        d_typ = np.uint8(0)  # train
+                        train_count += 1
 
                     record_pth = os.path.join(self.raw_folder, label, record_name)
                     record, fs = librosa.load(record_pth, offset=0, sr=None)
-                    
                     record = np.pad(record, [0, exp_len - record.size])
 
-                    data_type[r , 0] = d_typ
+                    data_type[r, 0] = d_typ
                     data_in[r] = record
 
                 dur = time.time() - time_s
@@ -247,11 +255,12 @@ class KWS:
 
             raw_dataset = (data_in_all, data_class_all, data_type_all)
 
-        print(f'Training+Validation: {train_count},  Test: {test_count}')
+        print(f'Training: {train_count}, Validation: {valid_count}, Test: {test_count}')
         return raw_dataset
 
     # dynamic augmentation application
-    def __dynamic_augment(self, record, fs = 16000, verbose=False, exp_len=16384, row_len=128, overlap_ratio=0):
+    def __dynamic_augment(self, record, fs=16000,
+                          verbose=False, exp_len=16384, row_len=128, overlap_ratio=0):
 
         audio = self.augment(record, fs)
         data_in = self.reshape_file(audio)
@@ -260,7 +269,7 @@ class KWS:
     def reshape_file(self, audio, row_len=128, exp_len=16384, overlap_ratio=0):
         """ Reshaping sizes of the records and quantize
         """
-        
+
         overlap = int(np.ceil(row_len * overlap_ratio))
         num_rows = int(np.ceil(exp_len / (row_len - overlap)))
 
@@ -268,7 +277,7 @@ class KWS:
             data_in = np.empty((row_len, num_rows), dtype=np.uint8)
         else:
             data_in = np.empty((row_len, num_rows), dtype=np.float32)
-        
+
         for n_r in range(num_rows):
             start_idx = n_r * (row_len - overlap)
             end_idx = start_idx + row_len
@@ -278,9 +287,9 @@ class KWS:
             if not self.save_unquantized:
                 data_in[:, n_r] = \
                     KWS.quantize_audio(audio_chunk,
-                                        num_bits=self.quantization['bits'],
-                                        compand=self.quantization['compand'],
-                                        mu=self.quantization['mu'])
+                                       num_bits=self.quantization['bits'],
+                                       compand=self.quantization['compand'],
+                                       mu=self.quantization['mu'])
             else:
                 data_in[:, n_r] = audio_chunk
 
@@ -447,6 +456,7 @@ class KWS:
         print(f'\rFile conversion completed: {converted_count} files ')
 
     def __filter_dtype(self):
+
         if self.d_type == 'train':
             idx_to_select = (self.data_type == 0)[:, -1]
         elif self.d_type == 'test':
@@ -455,9 +465,32 @@ class KWS:
             print(f'Unknown data type: {self.d_type}')
             return
 
+        set_size = idx_to_select.sum()
+        print(f'{self.d_type} set: {set_size} elements')
+        # take a copy of the original data and targets temporarily for validation set
+        self.data_original = self.data.clone()
+        self.targets_original = self.targets.clone()
+        self.data_type_original = self.data_type.clone()
         self.data = self.data[idx_to_select, :]
         self.targets = self.targets[idx_to_select, :]
         self.data_type = self.data_type[idx_to_select, :]
+
+        # append validation set to the training set if validation examples are explicitly included
+        if self.d_type == 'train':
+            idx_to_select = (self.data_type_original == 2)[:, -1]
+            if idx_to_select.sum() > 0:  # if validation examples exist
+                self.data = torch.cat((self.data, self.data_original[idx_to_select, :]), dim=0)
+                self.targets = \
+                    torch.cat((self.targets, self.targets_original[idx_to_select, :]), dim=0)
+                self.data_type = \
+                    torch.cat((self.data_type, self.data_type_original[idx_to_select, :]), dim=0)
+                # indicate the list of validation indices to be used by distiller's dataloader
+                self.valid_indices = range(set_size, set_size + idx_to_select.sum())
+                print(f'validation set: {idx_to_select.sum()} elements')
+
+        del self.data_original
+        del self.targets_original
+        del self.data_type_original
 
     def __filter_classes(self):
         initial_new_class_label = len(self.class_dict)
@@ -481,8 +514,7 @@ class KWS:
 
     def __getitem__(self, index):
         inp, target, data_type = self.data[index], int(self.targets[index]), self.data_type[index]
-
-        if data_type == 0:
+        if data_type != 1:  # if not test: augmentation applied to train and validation
             inp = self.__dynamic_augment(inp)
         else:
             inp = self.reshape_file(inp)
@@ -495,7 +527,6 @@ class KWS:
             inp = self.transform(inp)
 
         return inp, target
-
 
     @staticmethod
     def add_white_noise(audio, noise_var_coeff):
@@ -533,7 +564,7 @@ class KWS:
         audio_f_spec[audio_psd < threshold] = 0
         inv_fft = np.fft.irfft(audio_f_spec)
 
-        fft = np.array(inv_fft, dtype = np.float32)
+        fft = np.array(inv_fft, dtype=np.float32)
         fft_threshold = abs(fft).mean()
 
         start_pt = np.argmax(abs(fft) > fft_threshold)
@@ -547,9 +578,9 @@ class KWS:
         """
         random_noise_var_coeff = np.random.uniform(self.augmentation['noise_var']['min'],
                                                    self.augmentation['noise_var']['max'])
-        
+
         random_stretch_coeff = np.random.uniform(self.augmentation['stretch']['min'],
-                                                self.augmentation['stretch']['max'])
+                                                 self.augmentation['stretch']['max'])
 
         random_shift_time = np.random.uniform(self.augmentation['shift']['min'],
                                               self.augmentation['shift']['max'])
