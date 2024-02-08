@@ -111,6 +111,12 @@ class MSnoise:
         self.__download_raw(self.url_train)
         self.__download_raw(self.url_test)
 
+        for record_name in os.listdir(self.noise_test_folder):
+            if 'Neighbor' in record_name.split('_')[0]:
+                rec_pth = f'NeighborSpeaking_{record_name.split("_")[-1]}'
+                rec_pth = os.path.join(self.noise_test_folder, rec_pth)
+                os.rename(os.path.join(self.noise_test_folder, record_name), rec_pth)
+
     def __download_raw(self, api_url):
         opener = urllib.request.build_opener()
         opener.addheaders = [('User-agent', 'Mozilla/5.0')]
@@ -202,9 +208,8 @@ class MSnoise:
 
             for label in labels:
                 if label not in check_label:
-                    if label != 'NeighborSpeaking':
-                        print(f'Label {label} is not in the MSnoise {self.d_type} dataset.')
-                        labels.remove(label)
+                    print(f'Label {label} is not in the MSnoise {self.d_type} dataset.')
+                    labels.remove(label)
 
             print(f'Labels for {self.d_type}: {labels}')
 
