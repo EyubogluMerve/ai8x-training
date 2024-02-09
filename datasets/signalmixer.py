@@ -185,6 +185,8 @@ def signalmixer_get_datasets(data, snr_range, noise_type, desired_probs, apply_p
 def signalmixer_all_get_datasets(data, load_train=True, load_test=True):
     """
     Returns the KWS dataset mixed with MSnoise dataset.
+    It uses %80 probability for addition of noise.
+    Noises are applied between -5 to 10 dB.
     """
     snr_range = range(-5, 10)
     noise_type = ['AirConditioner', 'AirportAnnouncements',
@@ -205,6 +207,8 @@ def signalmixer_all_get_datasets(data, load_train=True, load_test=True):
 def signalmixer_all_100_get_datasets(data, load_train=True, load_test=True):
     """
     Returns the KWS dataset mixed with MSnoise dataset.
+    It uses %100 probability for addition of noise.
+    Noises are applied between -5 to 10 dB.
     """
     snr_range = range(-5, 10)
     noise_type = ['AirConditioner', 'AirportAnnouncements',
@@ -225,6 +229,8 @@ def signalmixer_all_100_get_datasets(data, load_train=True, load_test=True):
 def signalmixer_all_snr_get_datasets(data, load_train=True, load_test=True):
     """
     Returns the KWS dataset mixed with MSnoise dataset.
+    It uses %80 probability for addition of noise.
+    Noises are applied between 0 to 15 dB.
     """
     snr_range = range(0, 15)
     noise_type = ['AirConditioner', 'AirportAnnouncements',
@@ -244,7 +250,9 @@ def signalmixer_all_snr_get_datasets(data, load_train=True, load_test=True):
 
 def signalmixer_babble_get_datasets(data, load_train=True, load_test=True):
     """
-    Returns the KWS dataset mixed with MSnoise dataset.
+    Returns the KWS dataset mixed with MSnoise's Babble Noise.
+    It uses %80 probability for addition of noise.
+    Noises are applied between -5 to 10 dB.
     """
     snr_range = range(-5, 10)
     noise_type = ['Babble']
@@ -258,7 +266,9 @@ def signalmixer_babble_get_datasets(data, load_train=True, load_test=True):
 
 def signalmixer_vacuum_get_datasets(data, load_train=True, load_test=True):
     """
-    Returns the KWS dataset mixed with MSnoise dataset.
+    Returns the KWS dataset mixed with MSnoise's VacuumCleaner Noise.
+    It uses %80 probability for addition of noise.
+    Noises are applied between -5 to 10 dB.
     """
     snr_range = range(-5, 10)
     noise_type = ['VacuumCleaner']
@@ -272,7 +282,9 @@ def signalmixer_vacuum_get_datasets(data, load_train=True, load_test=True):
 
 def signalmixer_mixed_get_datasets(data, load_train=True, load_test=True):
     """
-    Returns the KWS dataset mixed with MSnoise dataset.
+    Returns the KWS dataset mixed with MSnoise's Babble, VacuumCleaner, Typing & CopyMachine Noise.
+    It uses %80 probability for addition of noise.
+    Noises are applied between -5 to 10 dB.
     """
     snr_range = range(-5, 10)
     noise_type = ['Babble', 'VacuumCleaner', 'Typing', 'CopyMachine']
