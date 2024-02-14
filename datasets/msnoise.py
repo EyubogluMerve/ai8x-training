@@ -43,11 +43,11 @@ class MSnoise:
     Args:
     root (string): Root directory of dataset where ``MSnoise/processed/dataset.pt``
         exist.
-    classes(array): List of keywords to be used.
-    d_type(string): Option for the created dataset. ``train`` or ``test``.
-    dataset_len(int): Dataset length to be returned.
-    remove_unknowns (bool, optional): If true, unchosen classes are not gathered as
-        the unknown class.
+    classes (array): List of keywords to be used.
+    d_type (string): Option for the created dataset. ``train`` or ``test``.
+    dataset_len (int): Dataset length to be returned.
+    exp_len (int, optional): Expected length of the 1-sec audio samples.
+    desired_probs (array, optional): Desired probabilities array for each noise type specfied.
     transform (callable, optional): A function/transform that takes in an PIL image
         and returns a transformed version.
     quantize (bool, optional): If true, the datasets are prepared and saved as
@@ -111,6 +111,7 @@ class MSnoise:
         self.__download_raw(self.url_train)
         self.__download_raw(self.url_test)
 
+        # Fixing the naming differences
         for record_name in os.listdir(self.noise_test_folder):
             if 'Neighbor' in record_name.split('_')[0]:
                 rec_pth = f'NeighborSpeaking_{record_name.split("_")[-1]}'
