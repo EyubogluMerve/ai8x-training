@@ -160,10 +160,10 @@ class KWS:
                       'Using 0.')
                 self.augmentation['aug_num'] = 0
             elif self.augmentation['aug_num'] != 0:
-                if 'noise_var' not in augmentation:
-                    print('No key `noise_var` in input augmentation dictionary! ',
-                          'Using defaults: [Min: 0., Max: 1.]')
-                    self.augmentation['noise_var'] = {'min': 0., 'max': 1.}
+                if 'snr' not in augmentation:
+                    print('No key `snr` in input augmentation dictionary! ',
+                          'Using defaults: [Min: 5.0, Max: 30.]')
+                    self.augmentation['snr'] = {'min': 5.0, 'max': 30.0}
                 if 'shift' not in augmentation:
                     print('No key `shift` in input augmentation dictionary! '
                           'Using defaults: [Min:-0.1, Max: 0.1]')
@@ -420,12 +420,13 @@ class KWS:
     def shift_and_noise_augment(self, audio, shift_limits):
         """Augments audio by adding random shift and noise.
         """
-        random_noise_var_coeff = np.random.uniform(self.augmentation['noise_var']['min'],
-                                                   self.augmentation['noise_var']['max'])
+        random_snr_coeff = int(np.random.uniform(self.augmentation['snr']['min'],
+                               self.augmentation['snr']['max']))
+        random_snr_coeff = 10 ** (random_snr_coeff / 10)
         random_shift_sample = np.random.randint(shift_limits[0], shift_limits[1])
 
         aug_audio = self.shift(audio, random_shift_sample)
-        aug_audio = self.add_quantized_white_noise(aug_audio, random_noise_var_coeff)
+        aug_audio = self.add_quantized_white_noise(aug_audio, random_snr_coeff)
 
         return aug_audio
 
@@ -439,30 +440,29 @@ class KWS:
 
         # reshape to 2D
         inp = self.__reshape_audio(inp)
-
         inp = inp.type(torch.FloatTensor)
 
         if not self.save_unquantized:
-            inp /= 256
+            inp = inp / 256
         if self.transform is not None:
             inp = self.transform(inp)
-
         return inp, target
 
     @staticmethod
     def add_white_noise(audio, noise_var_coeff):
         """Adds zero mean Gaussian noise to image with specified variance.
         """
-        coeff = noise_var_coeff * np.mean(np.abs(audio))
+        coeff = noise_var_coeff * np.mean(np.abs(np.array(audio)))
         noisy_audio = audio + coeff * np.random.randn(len(audio))
         return noisy_audio
 
     @staticmethod
-    def add_quantized_white_noise(audio, noise_var_coeff):
+    def add_quantized_white_noise(audio, random_snr_coeff):
         """Adds zero mean Gaussian noise to image with specified variance.
         """
-        coeff = noise_var_coeff * torch.mean(torch.abs(audio.type(torch.float)-128))
-        noise = (coeff * torch.randn(len(audio))).type(torch.int16)
+        signal_var = torch.var(audio.type(torch.float))
+        noise_var_coeff = signal_var / random_snr_coeff
+        noise = (noise_var_coeff * np.random.randn(len(audio))).type(torch.int16)
         return (audio + noise).clip(0, 255).type(torch.uint8)
 
     @staticmethod
@@ -723,8 +723,8 @@ def KWS_get_datasets(data, load_train=True, load_test=True, num_classes=6):
     split is used by default.
 
     Data is augmented to 3x duplicate data by random stretch/shift and randomly adding noise where
-    the stretching coefficient, shift amount and noise variance are randomly selected between
-    0.8 and 1.3, -0.1 and 0.1, 0 and 1, respectively.
+    the stretching coefficient, shift amount and noise SNR level are randomly selected between
+    0.8 and 1.3, -0.1 and 0.1, 5 and 30, respectively.
     """
     (data_dir, args) = data
 
@@ -739,7 +739,7 @@ def KWS_get_datasets(data, load_train=True, load_test=True, num_classes=6):
         raise ValueError(f'Unsupported num_classes {num_classes}')
 
     augmentation = {'aug_num': 2, 'shift': {'min': -0.1, 'max': 0.1},
-                    'noise_var': {'min': 0, 'max': 1.0}}
+                    'snr': {'min': 5.0, 'max': 30.}}
     quantization_scheme = {'compand': False, 'mu': 10}
 
     if load_train:
