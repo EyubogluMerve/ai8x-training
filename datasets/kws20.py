@@ -98,7 +98,7 @@ class KWS:
         self.__parse_augmentation(augmentation)
 
         if not self.save_unquantized:
-            self.data_file = 'dataset3.pt'
+            self.data_file = 'dataset.pt'
         else:
             self.data_file = 'unquantized.pt'
 
@@ -162,8 +162,8 @@ class KWS:
             elif self.augmentation['aug_num'] != 0:
                 if 'snr' not in augmentation:
                     print('No key `snr` in input augmentation dictionary! ',
-                          'Using defaults: [Min: 5.0, Max: 30.]')
-                    self.augmentation['snr'] = {'min': 5.0, 'max': 30.0}
+                          'Using defaults: [Min: -5.0, Max: 20.]')
+                    self.augmentation['snr'] = {'min': -5.0, 'max': 20.0}
                 if 'shift' not in augmentation:
                     print('No key `shift` in input augmentation dictionary! '
                           'Using defaults: [Min:-0.1, Max: 0.1]')
@@ -450,22 +450,22 @@ class KWS:
         return inp, target
 
     @staticmethod
-    def add_white_noise(audio, noise_var_coeff):
-        """Adds zero mean Gaussian noise to image with specified variance.
+    def add_white_noise(audio, random_snr_coeff):
+        """Adds zero mean Gaussian noise to image with specified SNR value.
         """
-        coeff = noise_var_coeff * np.mean(np.abs(np.array(audio)))
-        noisy_audio = audio + coeff * np.random.randn(len(audio))
-        return noisy_audio
+        signal_var = torch.var(audio)
+        noise_var_coeff = signal_var / random_snr_coeff
+        noise = np.random.normal(0, torch.sqrt(noise_var_coeff), len(audio))
+        return audio + torch.Tensor(noise)
 
     @staticmethod
     def add_quantized_white_noise(audio, random_snr_coeff):
-        """Adds zero mean Gaussian noise to image with specified variance.
+        """Adds zero mean Gaussian noise to image with specified SNR value.
         """
         signal_var = torch.var(audio.type(torch.float))
         noise_var_coeff = signal_var / random_snr_coeff
-        print(f'Signal Variance: {signal_var}')
-        print(f'Noise Variance: {noise_var_coeff}')
-        noise = (noise_var_coeff * np.random.randn(len(audio))).type(torch.int16)
+        noise = np.random.normal(0, torch.sqrt(noise_var_coeff), len(audio))
+        noise = torch.Tensor(noise).type(torch.int16)
         return (audio + noise).clip(0, 255).type(torch.uint8)
 
     @staticmethod
@@ -742,7 +742,7 @@ def KWS_get_datasets(data, load_train=True, load_test=True, num_classes=6):
         raise ValueError(f'Unsupported num_classes {num_classes}')
 
     augmentation = {'aug_num': 2, 'shift': {'min': -0.1, 'max': 0.1},
-                    'snr': {'min': 5.0, 'max': 30.}}
+                    'snr': {'min': -5.0, 'max': 20.}}
     quantization_scheme = {'compand': False, 'mu': 10}
 
     if load_train:
