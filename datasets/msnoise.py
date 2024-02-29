@@ -43,19 +43,11 @@ class MSnoise:
     Args:
     root (string): Root directory of dataset where ``MSnoise/processed/dataset.pt``
         exist.
-<<<<<<< HEAD
     classes (array): List of keywords to be used.
     d_type (string): Option for the created dataset. ``train`` or ``test``.
     dataset_len (int): Dataset length to be returned.
     exp_len (int, optional): Expected length of the 1-sec audio samples.
     desired_probs (array, optional): Desired probabilities array for each noise type specified.
-=======
-    classes(array): List of keywords to be used.
-    d_type(string): Option for the created dataset. ``train`` or ``test``.
-    dataset_len(int): Dataset length to be returned.
-    remove_unknowns (bool, optional): If true, unchosen classes are not gathered as
-        the unknown class.
->>>>>>> 128b4d48a328550ff0c6b88bae40931a710b0899
     transform (callable, optional): A function/transform that takes in an PIL image
         and returns a transformed version.
     quantize (bool, optional): If true, the datasets are prepared and saved as
@@ -75,14 +67,8 @@ class MSnoise:
                   'Square': 18, 'SqueakyChair': 19, 'Station': 20, 'TradeShow': 21, 'Traffic': 22,
                   'Typing': 23, 'VacuumCleaner': 24, 'WasherDryer': 25, 'Washing': 26}
 
-<<<<<<< HEAD
     def __init__(self, root, classes, d_type, dataset_len, exp_len=16384, desired_probs=None,
                  transform=None, quantize=False, download=False):
-=======
-    def __init__(self, root, classes, d_type, dataset_len, exp_len=16384, fs=16000,
-                 noise_time_step=0.25, remove_unknowns=False, transform=None,
-                 quantize=False, download=False):
->>>>>>> 128b4d48a328550ff0c6b88bae40931a710b0899
         self.root = root
         self.classes = classes
         self.d_type = d_type
@@ -90,12 +76,7 @@ class MSnoise:
 
         self.dataset_len = dataset_len
         self.exp_len = exp_len
-<<<<<<< HEAD
         self.desired_probs = desired_probs
-=======
-        self.fs = fs
-        self.noise_time_step = noise_time_step
->>>>>>> 128b4d48a328550ff0c6b88bae40931a710b0899
 
         self.noise_train_folder = os.path.join(self.raw_folder, 'noise_train')
         self.noise_test_folder = os.path.join(self.raw_folder, 'noise_test')
@@ -109,12 +90,6 @@ class MSnoise:
             self.__download()
 
         self.data, self.targets, self.data_type, self.rms_val = self.__gen_datasets()
-<<<<<<< HEAD
-=======
-
-        # rms values for each sample to be returned
-        self.rms = np.zeros(self.dataset_len)
->>>>>>> 128b4d48a328550ff0c6b88bae40931a710b0899
 
         # rms values for each sample to be returned
         self.rms = np.zeros(self.dataset_len)
@@ -135,7 +110,6 @@ class MSnoise:
 
         self.__download_raw(self.url_train)
         self.__download_raw(self.url_test)
-<<<<<<< HEAD
 
         # Fixing the naming differences
         for record_name in os.listdir(self.noise_test_folder):
@@ -143,8 +117,6 @@ class MSnoise:
                 rec_pth = f'NeighborSpeaking_{record_name.split("_")[-1]}'
                 rec_pth = os.path.join(self.noise_test_folder, rec_pth)
                 os.rename(os.path.join(self.noise_test_folder, record_name), rec_pth)
-=======
->>>>>>> 128b4d48a328550ff0c6b88bae40931a710b0899
 
     def __download_raw(self, api_url):
         opener = urllib.request.build_opener()
@@ -180,55 +152,6 @@ class MSnoise:
             else:
                 raise
 
-<<<<<<< HEAD
-=======
-    def __filter_dtype(self):
-
-        if self.d_type == 'train':
-            bool_list = [i == 0 for i in self.data_type]
-            idx_to_select = [i for i, x in enumerate(bool_list) if x]
-        elif self.d_type == 'test':
-            bool_list = [i == 1 for i in self.data_type]
-            idx_to_select = [i for i, x in enumerate(bool_list) if x]
-        else:
-            print(f'Unknown data type: {self.d_type}')
-            return
-
-        self.data = [self.data[i] for i in idx_to_select]
-        self.targets = [self.targets[i] for i in idx_to_select]
-        self.rms_val = [self.rms_val[i] for i in idx_to_select]
-        del self.data_type
-
-    def __filter_classes(self):
-        print('\n')
-        self.targets = np.array(self.targets)
-        initial_new_class_label = len(self.class_dict)
-        new_class_label = initial_new_class_label
-        for c in self.classes:
-            if c not in self.class_dict:
-                print(f'Class is not in the data: {c}')
-                return
-            # else:
-            print(f'Class {c}, {self.class_dict[c]}')
-            bool_list = [self.class_dict[c] == i for i in self.targets]
-            idx = [i for i, x in enumerate(bool_list) if x]
-            self.targets[idx] = new_class_label
-            print(f'{c}: {new_class_label - initial_new_class_label}')
-            new_class_label += 1
-
-        self.targets[(self.targets < initial_new_class_label)] = new_class_label
-        if self.remove_unknowns:
-            bool_list = [i != new_class_label for i in self.targets]
-            idx_to_keep = [i for i, x in enumerate(bool_list) if x]
-
-            self.data = [self.data[i] for i in idx_to_keep]
-            self.targets = [self.targets[i] for i in idx]
-            self.rms_val = [self.rms_val[i] for i in idx]
-
-        self.targets = [target - initial_new_class_label for target in self.targets]
-        print('\n')
-
->>>>>>> 128b4d48a328550ff0c6b88bae40931a710b0899
     @staticmethod
     def quantize_audio(data, num_bits=8):
         """Quantize audio
@@ -245,20 +168,10 @@ class MSnoise:
 
     def __getitem__(self, index):
 
-<<<<<<< HEAD
         rnd_num = np.random.choice(range(len(self.data)), p=self.final_probs)
         self.rms[index] = self.rms_val[rnd_num]
 
         rec_len = len(self.data[rnd_num])
-=======
-        rec_num = len(self.data)
-
-        rnd_num = np.random.randint(0, rec_num)
-        self.rms[index] = self.rms_val[rnd_num]
-
-        rec_len = len(self.data[rnd_num])
-
->>>>>>> 128b4d48a328550ff0c6b88bae40931a710b0899
         max_start_idx = rec_len - self.exp_len
         start_idx = np.random.randint(0, max_start_idx)
         end_idx = start_idx + self.exp_len
@@ -276,11 +189,7 @@ class MSnoise:
 
         return torch.transpose(torch.tensor(audio.reshape((-1, row_len))), 1, 0)
 
-<<<<<<< HEAD
     def __gen_datasets(self):
-=======
-    def __gen_datasets(self, exp_len=16384, row_len=128, overlap_ratio=0):
->>>>>>> 128b4d48a328550ff0c6b88bae40931a710b0899
 
         with warnings.catch_warnings():
             warnings.simplefilter('error')
@@ -290,7 +199,6 @@ class MSnoise:
             test_list = sorted(os.listdir(self.noise_test_folder))
             labels_train = set(sorted({i.split('_')[0] for i in train_list if '_' in i}))
             labels_test = set(sorted({i.split('_')[0] for i in test_list if '_' in i}))
-<<<<<<< HEAD
 
             if self.d_type == 'train':
                 check_label = labels_train
@@ -320,35 +228,14 @@ class MSnoise:
             print(f'Desired probabilities for each class: {self.desired_probs}')
 
             self.data_class_count = {}
-=======
-            labels = labels_train | labels_test
-            labels_to_remove = set()
-            for label in labels:
-                other_labels = labels - {label}
-                for other_label_name in other_labels:
-                    if label in other_label_name:
-                        labels_to_remove.add(label)
-                        break
-            labels = labels - labels_to_remove
-            labels = sorted(labels)
-            print(f'Labels: {labels}')
-
-            # Folders
-            train_test_folders = [self.noise_train_folder, self.noise_test_folder]
-
->>>>>>> 128b4d48a328550ff0c6b88bae40931a710b0899
             data_in = []
             data_type = []
             data_class = []
             rms_val = []
 
             for i, label in enumerate(labels):
-<<<<<<< HEAD
                 count = 0
                 for folder in audio_folder:
-=======
-                for folder in train_test_folders:
->>>>>>> 128b4d48a328550ff0c6b88bae40931a710b0899
                     for record_name in os.listdir(folder):
                         if record_name.split('_')[0] in label:
                             record_path = os.path.join(folder, record_name)
@@ -366,7 +253,6 @@ class MSnoise:
 
                             data_class.append(i)
                             rms_val.append(np.mean(record**2)**0.5)
-<<<<<<< HEAD
                             count += 1
                 self.data_class_count[label] = count
 
@@ -385,14 +271,6 @@ class MSnoise:
 
 def MSnoise_get_datasets(data, desired_probs=None, train_len=346338, test_len=11005,
                          load_train=True, load_test=True):
-=======
-
-            noise_dataset = (data_in, data_class, data_type, rms_val)
-        return noise_dataset
-
-
-def MSnoise_get_datasets(data, load_train=True, load_test=True):
->>>>>>> 128b4d48a328550ff0c6b88bae40931a710b0899
     """
     Load the folded 1D version of MS Scalable Noisy Speech dataset (MS-SNSD)
 
@@ -417,27 +295,17 @@ def MSnoise_get_datasets(data, load_train=True, load_test=True):
     quantize = True
 
     if load_train:
-<<<<<<< HEAD
         train_dataset = MSnoise(root=data_dir, classes=classes, d_type='train',
                                 dataset_len=train_len, desired_probs=desired_probs,
                                 transform=transform,
-=======
-        train_dataset = MSnoise(root=data_dir, classes=classes, d_type='train', dataset_len=11005,
-                                remove_unknowns=remove_unknowns, transform=transform,
->>>>>>> 128b4d48a328550ff0c6b88bae40931a710b0899
                                 quantize=quantize, download=True)
     else:
         train_dataset = None
 
     if load_test:
-<<<<<<< HEAD
         test_dataset = MSnoise(root=data_dir, classes=classes, d_type='test',
                                dataset_len=test_len, desired_probs=desired_probs,
                                transform=transform,
-=======
-        test_dataset = MSnoise(root=data_dir, classes=classes, d_type='test', dataset_len=11005,
-                               remove_unknowns=remove_unknowns, transform=transform,
->>>>>>> 128b4d48a328550ff0c6b88bae40931a710b0899
                                quantize=quantize, download=True)
 
         if args.truncate_testset:
@@ -467,35 +335,21 @@ def MSnoise_get_unquantized_datasets(data, desired_probs=None, train_len=346338,
                'Square', 'SqueakyChair', 'Station', 'Traffic',
                'Typing', 'VacuumCleaner', 'WasherDryer', 'Washing', 'TradeShow']
 
-<<<<<<< HEAD
-=======
-    remove_unknowns = True
->>>>>>> 128b4d48a328550ff0c6b88bae40931a710b0899
     transform = None
     quantize = False
 
     if load_train:
-<<<<<<< HEAD
         train_dataset = MSnoise(root=data_dir, classes=classes, d_type='train',
                                 dataset_len=train_len, desired_probs=desired_probs,
                                 transform=transform,
-=======
-        train_dataset = MSnoise(root=data_dir, classes=classes, d_type='train', dataset_len=11005,
-                                remove_unknowns=remove_unknowns, transform=transform,
->>>>>>> 128b4d48a328550ff0c6b88bae40931a710b0899
                                 quantize=quantize, download=True)
     else:
         train_dataset = None
 
     if load_test:
-<<<<<<< HEAD
         test_dataset = MSnoise(root=data_dir, classes=classes, d_type='test',
                                dataset_len=test_len, desired_probs=desired_probs,
                                transform=transform,
-=======
-        test_dataset = MSnoise(root=data_dir, classes=classes, d_type='test', dataset_len=11005,
-                               remove_unknowns=remove_unknowns, transform=transform,
->>>>>>> 128b4d48a328550ff0c6b88bae40931a710b0899
                                quantize=quantize, download=True)
 
         if args.truncate_testset:

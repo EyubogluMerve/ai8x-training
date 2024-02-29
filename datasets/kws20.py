@@ -1,6 +1,5 @@
 ###################################################################################################
 #
-<<<<<<< HEAD
 # Copyright (C) 2023-2024 Analog Devices, Inc. All Rights Reserved.
 # This software is proprietary and confidential to Analog Devices, Inc. and its licensors.
 #
@@ -14,11 +13,6 @@
 ###################################################################################################
 #
 # Portions Copyright (c) 2018 Intel Corporation
-=======
-# Copyright (c) 2018 Intel Corporation
-# Portions Copyright (C) 2019-2023 Maxim Integrated Products, Inc.
-# Portions Copyright (C) 2023-2024 Analog Devices, Inc.
->>>>>>> 128b4d48a328550ff0c6b88bae40931a710b0899
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -426,7 +420,6 @@ class KWS:
     def shift_and_noise_augment(self, audio, shift_limits):
         """Augments audio by adding random shift and noise.
         """
-<<<<<<< HEAD
         random_snr_coeff = int(np.random.uniform(self.augmentation['snr']['min'],
                                self.augmentation['snr']['max']))
         print(f'SNR : {random_snr_coeff}')
@@ -435,14 +428,6 @@ class KWS:
 
         aug_audio = self.shift(audio, random_shift_sample)
         aug_audio = self.add_quantized_white_noise(aug_audio, random_snr_coeff)
-=======
-        random_noise_var_coeff = np.random.uniform(self.augmentation['noise_var']['min'],
-                                                   self.augmentation['noise_var']['max'])
-        random_shift_sample = np.random.randint(shift_limits[0], shift_limits[1])
-
-        aug_audio = self.shift(audio, random_shift_sample)
-        aug_audio = self.add_quantized_white_noise(aug_audio, random_noise_var_coeff)
->>>>>>> 128b4d48a328550ff0c6b88bae40931a710b0899
 
         return aug_audio
 
@@ -456,10 +441,6 @@ class KWS:
 
         # reshape to 2D
         inp = self.__reshape_audio(inp)
-<<<<<<< HEAD
-=======
-
->>>>>>> 128b4d48a328550ff0c6b88bae40931a710b0899
         inp = inp.type(torch.FloatTensor)
 
         if not self.save_unquantized:
@@ -470,13 +451,8 @@ class KWS:
         return inp, target
 
     @staticmethod
-<<<<<<< HEAD
     def add_white_noise(audio, random_snr_coeff):
         """Adds zero mean Gaussian noise to image with specified SNR value.
-=======
-    def add_white_noise(audio, noise_var_coeff):
-        """Adds zero mean Gaussian noise to the audio with specified variance.
->>>>>>> 128b4d48a328550ff0c6b88bae40931a710b0899
         """
         signal_var = torch.var(audio)
         noise_var_coeff = signal_var / random_snr_coeff
@@ -484,7 +460,6 @@ class KWS:
         return audio + torch.Tensor(noise)
 
     @staticmethod
-<<<<<<< HEAD
     def add_quantized_white_noise(audio, random_snr_coeff):
         """Adds zero mean Gaussian noise to image with specified SNR value.
         """
@@ -492,13 +467,6 @@ class KWS:
         noise_var_coeff = signal_var / random_snr_coeff
         noise = np.random.normal(0, torch.sqrt(noise_var_coeff), len(audio))
         noise = torch.Tensor(noise).type(torch.int16)
-=======
-    def add_quantized_white_noise(audio, noise_var_coeff):
-        """Adds zero mean Gaussian noise to the audio with specified variance.
-        """
-        coeff = noise_var_coeff * torch.mean(torch.abs(audio.type(torch.float)-128))
-        noise = (coeff * torch.randn(len(audio))).type(torch.int16)
->>>>>>> 128b4d48a328550ff0c6b88bae40931a710b0899
         return (audio + noise).clip(0, 255).type(torch.uint8)
 
     @staticmethod
@@ -551,11 +519,7 @@ class KWS:
             q_data = np.clip(q_data, 0, max_val)
         return np.uint8(q_data)
 
-<<<<<<< HEAD
     def energy_detector(self, audio, fs):
-=======
-    def get_audio_endpoints(self, audio, fs):
->>>>>>> 128b4d48a328550ff0c6b88bae40931a710b0899
         """Future: May implement a method to detect the beginning & end of voice activity in audio.
         Currently, it returns end points compatible with augmentation['shift'] values
         """
@@ -582,11 +546,7 @@ class KWS:
         aug_audio = [None] * (n_augment + 1)
         aug_speed = np.ones((n_augment + 1,))
         shift_limits = np.zeros((n_augment + 1, 2))
-<<<<<<< HEAD
         voice_begin_idx, voice_end_idx = self.energy_detector(audio, fs)
-=======
-        voice_begin_idx, voice_end_idx = self.get_audio_endpoints(audio, fs)
->>>>>>> 128b4d48a328550ff0c6b88bae40931a710b0899
         aug_audio[0] = audio
         for i in range(n_augment):
             aug_audio[i+1], aug_speed[i+1] = self.speed_augment(audio, fs, sample_no=i)
@@ -727,7 +687,6 @@ class KWS:
             data_class_all = torch.from_numpy(data_class_all)
             data_type_all = torch.from_numpy(data_type_all)
             data_shift_limits_all = torch.from_numpy(data_shift_limits_all)
-<<<<<<< HEAD
 
             # apply static shift & noise augmentation for validation examples
             for sample_index in range(data_in_all.shape[0]):
@@ -736,16 +695,6 @@ class KWS:
                         self.shift_and_noise_augment(data_in_all[sample_index],
                                                      data_shift_limits_all[sample_index])
 
-=======
-
-            # apply static shift & noise augmentation for validation examples
-            for sample_index in range(data_in_all.shape[0]):
-                if data_type_all[sample_index] == 2:
-                    data_in_all[sample_index] = \
-                        self.shift_and_noise_augment(data_in_all[sample_index],
-                                                     data_shift_limits_all[sample_index])
-
->>>>>>> 128b4d48a328550ff0c6b88bae40931a710b0899
             raw_dataset = (data_in_all, data_class_all, data_type_all, data_shift_limits_all)
             torch.save(raw_dataset, os.path.join(self.processed_folder, self.data_file))
 
@@ -794,11 +743,7 @@ def KWS_get_datasets(data, load_train=True, load_test=True, num_classes=6):
         raise ValueError(f'Unsupported num_classes {num_classes}')
 
     augmentation = {'aug_num': 2, 'shift': {'min': -0.1, 'max': 0.1},
-<<<<<<< HEAD
                     'snr': {'min': -5.0, 'max': 20.}}
-=======
-                    'noise_var': {'min': 0, 'max': 1.0}}
->>>>>>> 128b4d48a328550ff0c6b88bae40931a710b0899
     quantization_scheme = {'compand': False, 'mu': 10}
 
     if load_train:
