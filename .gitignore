@@ -2,14 +2,16 @@
 *.mem
 *.prof
 /.mypy_cache/
+/.venv/
 /.vscode/
 **/build/
-/data/
+/data
 /latest_log_dir
 /latest_log_file
 /logs/
 /ninja-python-distributions
 /pip-selfcheck.json
+/pretrained/
 /sensitivity.csv
 /sensitivity.png
 /tensorflow/
