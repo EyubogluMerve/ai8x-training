@@ -422,7 +422,6 @@ class KWS:
         """
         random_snr_coeff = int(np.random.uniform(self.augmentation['snr']['min'],
                                self.augmentation['snr']['max']))
-        print(f'SNR : {random_snr_coeff}')
         random_snr_coeff = 10 ** (random_snr_coeff / 10)
         random_shift_sample = np.random.randint(shift_limits[0], shift_limits[1])
 
