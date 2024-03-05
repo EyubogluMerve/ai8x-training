@@ -56,14 +56,14 @@ class KWS:
     Dataset, 1D folded.
 
     Args:
-    root (string): Root directory of dataset where ``KWS/processed/dataset.pt``
-        exist.
+    root (string): Root directory of dataset where ``KWS/processed/dataset.pt`` exist.
     classes(array): List of keywords to be used.
     d_type(string): Option for the created dataset. ``train`` or ``test``.
-    n_augment(int, optional): Number of augmented samples added to the dataset from
-        each sample by random modifications, i.e. stretching, shifting and random noise.
-    transform (callable, optional): A function/transform that takes in an PIL image
-        and returns a transformed version.
+    transform (callable, optional): A function/transform that takes in a signal between [0, 1]
+        and returns a transformed version, suitable for ai8x training / evaluation.
+    quantization_scheme (dict, optional): Dictionary containing quantization scheme parameters.
+        If not provided, default values are used.
+    augmentation (dict, optional): Dictionary containing augmentation parameters.
     download (bool, optional): If true, downloads the dataset from the internet and
         puts it in root directory. If dataset is already downloaded, it is not
         downloaded again.
@@ -422,7 +422,6 @@ class KWS:
         """
         random_snr_coeff = int(np.random.uniform(self.augmentation['snr']['min'],
                                self.augmentation['snr']['max']))
-        print(f'SNR : {random_snr_coeff}')
         random_snr_coeff = 10 ** (random_snr_coeff / 10)
         random_shift_sample = np.random.randint(shift_limits[0], shift_limits[1])
 
@@ -447,6 +446,7 @@ class KWS:
             inp = inp / 256
         if self.transform is not None:
             inp = self.transform(inp)
+
         return inp, target
 
     @staticmethod
