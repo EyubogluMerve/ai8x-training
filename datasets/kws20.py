@@ -1132,7 +1132,7 @@ datasets = [
         'input': (128, 128),
         'output': ('down', 'go', 'left', 'no', 'off', 'on', 'right', 'stop', 'up', 'yes',
                    'silence', 'UNKNOWN'),
-        'weight': (1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0.6, 0.06),
+        'weight': (1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0.6, 0.04),
         'loader': KWS_12_benchmark_get_datasets,
     },
     {
