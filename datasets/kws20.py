@@ -882,7 +882,7 @@ def KWS_get_datasets(data, load_train=True, load_test=True, num_classes=6, bench
         ai8x.normalize(args=args)
     ])
 
-    if num_classes in (6, 11, 20):
+    if num_classes in (6, 11, 20, 35):
         classes = next((e for _, e in enumerate(datasets)
                         if len(e['output']) - 1 == num_classes))['output'][:-1]
     else:
@@ -1132,7 +1132,7 @@ datasets = [
         'input': (128, 128),
         'output': ('down', 'go', 'left', 'no', 'off', 'on', 'right', 'stop', 'up', 'yes',
                    'silence', 'UNKNOWN'),
-        'weight': (1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0.6, 0.04),
+        'weight': (1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0.6, 0.06),
         'loader': KWS_12_benchmark_get_datasets,
     },
     {
