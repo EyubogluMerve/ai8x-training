@@ -108,7 +108,7 @@ class KWS:
         print(f'\nProcessing {self.d_type}...')
         self.__filter_dtype()
 
-        if not self.benchmark:
+        if self.benchmark:
             self.__filter_silence()
         else:
             self.__filter_librispeech()
@@ -882,9 +882,12 @@ def KWS_get_datasets(data, load_train=True, load_test=True, num_classes=6, bench
         ai8x.normalize(args=args)
     ])
 
-    if num_classes in (6, 11, 20, 35):
+    if num_classes in (6, 11, 20):
         classes = next((e for _, e in enumerate(datasets)
                         if len(e['output']) - 1 == num_classes))['output'][:-1]
+    elif num_classes == 35:
+        classes = next((e for _, e in enumerate(datasets)
+                        if len(e['output']) == num_classes))['output']
     else:
         raise ValueError(f'Unsupported num_classes {num_classes}')
 
@@ -975,6 +978,13 @@ def KWS_get_unquantized_datasets(data, load_train=True, load_test=True, num_clas
         test_dataset = None
 
     return train_dataset, test_dataset
+
+
+def KWS_35_get_datasets(data, load_train=True, load_test=True):
+    """
+    Load the folded 1D version of unquantized SpeechCom dataset for 35 classes.
+    """
+    return KWS_get_datasets(data, load_train, load_test, num_classes=35, benchmark=True)
 
 
 def KWS_35_get_unquantized_datasets(data, load_train=True, load_test=True):
@@ -1104,6 +1114,19 @@ datasets = [
                    'UNKNOWN'),
         'weight': (1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0.07),
         'loader': KWS_20_get_datasets,
+    },
+    {
+        'name': 'KWS_35',  # 35 keywords (no unknown)
+        'input': (128, 128),
+        'output': ('backward', 'bed', 'bird', 'cat', 'dog', 'down',
+                   'eight', 'five', 'follow', 'forward', 'four', 'go',
+                   'happy', 'house', 'learn', 'left', 'marvin', 'nine',
+                   'no', 'off', 'on', 'one', 'right', 'seven',
+                   'sheila', 'six', 'stop', 'three', 'tree', 'two',
+                   'up', 'visual', 'wow', 'yes', 'zero'),
+        'weight': (1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                   1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1),
+        'loader': KWS_35_get_datasets,
     },
     {
         'name': 'KWS_35_unquantized',  # 35 keywords (no unknown)
