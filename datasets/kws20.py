@@ -95,7 +95,7 @@ class KWS:
         self.__parse_augmentation(augmentation)
 
         if not self.save_unquantized:
-            self.data_file = 'dataset3.pt'
+            self.data_file = 'dataset4.pt'
         else:
             self.data_file = 'unquantized.pt'
 
@@ -110,6 +110,8 @@ class KWS:
 
         if not self.benchmark:
             self.__filter_silence()
+            if len(classes) == 35:
+                self.__filter_librispeech()
         else:
             if len(classes) == 35:
                 self.__filter_silence()
@@ -791,7 +793,7 @@ class KWS:
                     record, fs = librosa.load(record_pth, offset=0, sr=None)
 
                     # normalize dynamic range to [-1, +1]
-                    record = record / np.max(np.abs(record))
+                    # record = record / np.max(np.abs(record))
 
                     # training and validation examplesget speed augmentation
                     if d_typ not in (1, 3):
@@ -1126,8 +1128,12 @@ datasets = [
                    'no', 'off', 'on', 'one', 'right', 'seven',
                    'sheila', 'six', 'stop', 'three', 'tree', 'two',
                    'up', 'visual', 'wow', 'yes', 'zero'),
-        'weight': (1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-                   1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1),
+        'weight': (0.006, 0.006, 0.006, 0.006, 0.006, 1,
+                   0.006, 0.006, 0.006, 0.006, 0.006, 1,
+                   0.006, 0.006, 0.006, 1, 0.006, 0.006,
+                   1, 1, 1, 0.006, 1, 0.006,
+                   0.006, 0.006, 1, 0.006, 0.006, 0.006,
+                   1, 0.006, 0.006, 1, 0.006),
         'loader': KWS_35_get_datasets,
     },
     {
