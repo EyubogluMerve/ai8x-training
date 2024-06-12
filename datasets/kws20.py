@@ -867,6 +867,22 @@ class KWS_20(KWS):
         return self.__class__.__name__
 
 
+classes_dict = {
+    'KWS': ('up', 'down', 'left', 'right', 'stop', 'go', 'UNKNOWN'),
+    'KWS_20': ('up', 'down', 'left', 'right', 'stop', 'go', 'yes', 'no', 'on', 'off', 'one',
+               'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'zero',
+               'UNKNOWN'),
+    'KWS_35': ('backward', 'bed', 'bird', 'cat', 'dog', 'down',
+               'eight', 'five', 'follow', 'forward', 'four', 'go',
+               'happy', 'house', 'learn', 'left', 'marvin', 'nine',
+               'no', 'off', 'on', 'one', 'right', 'seven',
+               'sheila', 'six', 'stop', 'three', 'tree', 'two',
+               'up', 'visual', 'wow', 'yes', 'zero'),
+    'KWS_12_benchmark': ('down', 'go', 'left', 'no', 'off', 'on', 'right', 'stop', 'up', 'yes',
+                         'silence', 'UNKNOWN')
+}
+
+
 def KWS_get_datasets(data, load_train=True, load_test=True, dataset_name='KWS', num_classes=6,
                      filter_silence=True, filter_libri=False, benchmark=False):
     """
@@ -892,9 +908,7 @@ def KWS_get_datasets(data, load_train=True, load_test=True, dataset_name='KWS', 
         ai8x.normalize(args=args)
     ])
 
-    for ds in datasets:
-        if ds['name'] == dataset_name:
-            classes = ds['output']
+    classes = classes_dict[dataset_name]
 
     augmentation = {'aug_num': 2, 'shift': {'min': -0.1, 'max': 0.1},
                     'snr': {'min': -5.0, 'max': 20.}}
@@ -957,9 +971,7 @@ def KWS_get_unquantized_datasets(data, load_train=True, load_test=True, dataset_
 
     transform = None
 
-    for ds in datasets:
-        if ds['name'] == dataset_name:
-            classes = ds['output']
+    classes = classes_dict[dataset_name]
 
     augmentation = {'aug_num': 0}
     quantization_scheme = {'bits': 0}
@@ -1003,7 +1015,7 @@ def KWS_35_get_unquantized_datasets(data, load_train=True, load_test=True):
     Load the folded 1D version of unquantized SpeechCom dataset for 35 classes.
     """
     return KWS_get_unquantized_datasets(data, load_train, load_test,
-                                        dataset_name='KWS_35_unquantized', num_classes=35)
+                                        dataset_name='KWS_35', num_classes=35)
 
 
 def KWS_20_msnoise_mixed_get_datasets(data, load_train=True, load_test=True,
